@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	ahoy_targets "gitlab.com/hidothealth/platform/ahoy/src/target"
-	"gitlab.com/hidothealth/platform/ahoy/src/utils"
+	zen_targets "github.com/zen-io/zen-core/target"
+	"github.com/zen-io/zen-core/utils"
 
 	"golang.org/x/exp/slices"
 )
@@ -25,30 +25,38 @@ type Archiver interface {
 }
 
 type ArchiveConfig struct {
-	ahoy_targets.BaseFields `mapstructure:",squash"`
-	Srcs                    []string    `mapstructure:"srcs"`
-	Type                    ArchiveType `mapstructure:"type"`
-	Out                     string      `mapstructure:"out"`
-	ExclusionFile           *string     `mapstructure:"exclusion_file"`
-	Exclusions              []string    `mapstructure:"exclusions"`
+	Name          string            `mapstructure:"name" desc:"Name for the target"`
+	Description   string            `mapstructure:"desc" desc:"Target description"`
+	Labels        []string          `mapstructure:"labels" desc:"Labels to apply to the targets"` //
+	Deps          []string          `mapstructure:"deps" desc:"Build dependencies"`
+	PassEnv       []string          `mapstructure:"pass_env" desc:"List of environment variable names that will be passed from the OS environment, they are part of the target hash"`
+	SecretEnv     []string          `mapstructure:"secret_env" desc:"List of environment variable names that will be passed from the OS environment, they are not used to calculate the target hash"`
+	Env           map[string]string `mapstructure:"env" desc:"Key-Value map of static environment variables to be used"`
+	Tools         map[string]string `mapstructure:"tools" desc:"Key-Value map of tools to include when executing this target. Values can be references"`
+	Visibility    []string          `mapstructure:"visibility" desc:"List of visibility for this target"`
+	Srcs          []string          `mapstructure:"srcs"`
+	Type          ArchiveType       `mapstructure:"type"`
+	Out           string            `mapstructure:"out"`
+	ExclusionFile *string           `mapstructure:"exclusion_file"`
+	Exclusions    []string          `mapstructure:"exclusions"`
 }
 
-func (ac ArchiveConfig) GetTargets(_ *ahoy_targets.TargetConfigContext) ([]*ahoy_targets.Target, error) {
+func (ac ArchiveConfig) GetTargets(_ *zen_targets.TargetConfigContext) ([]*zen_targets.Target, error) {
 	srcs := map[string][]string{"srcs": ac.Srcs}
 	if ac.ExclusionFile != nil {
 		srcs["exclusion"] = []string{*ac.ExclusionFile}
 	}
 
-	opts := []ahoy_targets.TargetOption{
-		ahoy_targets.WithSrcs(srcs),
-		ahoy_targets.WithOuts([]string{ac.Out}),
-		ahoy_targets.WithLabels(ac.Labels),
+	opts := []zen_targets.TargetOption{
+		zen_targets.WithSrcs(srcs),
+		zen_targets.WithOuts([]string{ac.Out}),
+		zen_targets.WithLabels(ac.Labels),
 	}
 
 	opts = append(opts,
-		ahoy_targets.WithTargetScript("build", &ahoy_targets.TargetScript{
+		zen_targets.WithTargetScript("build", &zen_targets.TargetScript{
 			Deps: ac.Deps,
-			Run: func(target *ahoy_targets.Target, runCtx *ahoy_targets.RuntimeContext) error {
+			Run: func(target *zen_targets.Target, runCtx *zen_targets.RuntimeContext) error {
 				var archiver Archiver
 				var err error
 				out := filepath.Join(target.Cwd, ac.Out)
@@ -108,8 +116,8 @@ func (ac ArchiveConfig) GetTargets(_ *ahoy_targets.TargetConfigContext) ([]*ahoy
 		}),
 	)
 
-	return []*ahoy_targets.Target{
-		ahoy_targets.NewTarget(
+	return []*zen_targets.Target{
+		zen_targets.NewTarget(
 			ac.Name,
 			opts...,
 		),

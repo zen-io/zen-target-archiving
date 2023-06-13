@@ -6,28 +6,27 @@ import (
 	"path/filepath"
 	"strings"
 
-	ahoy_targets "gitlab.com/hidothealth/platform/ahoy/src/target"
-
-	cp "github.com/otiai10/copy"
+	zen_targets "github.com/zen-io/zen-core/target"
+	"github.com/zen-io/zen-core/utils"
 
 	doublestar "github.com/bmatcuk/doublestar/v4"
 )
 
 type UnarchiveConfig struct {
-	ahoy_targets.BaseFields `mapstructure:",squash"`
-	Src                     string   `mapstructure:"src"`
-	Out                     *string  `mapstructure:"out"`
-	ExportedFiles           []string `mapstructure:"exported_files"`
-	Binary                  bool     `mapstructure:"binary"`
+	zen_targets.BaseFields `mapstructure:",squash"`
+	Src                    string   `mapstructure:"src"`
+	Out                    *string  `mapstructure:"out"`
+	ExportedFiles          []string `mapstructure:"exported_files"`
+	Binary                 bool     `mapstructure:"binary"`
 }
 
-func (uc UnarchiveConfig) GetTargets(tcc *ahoy_targets.TargetConfigContext) ([]*ahoy_targets.Target, error) {
+func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*zen_targets.Target, error) {
 	var outs []string
 	var extractTargetName string
 	if len(uc.ExportedFiles) == 0 && uc.Out == nil {
 		return nil, fmt.Errorf("need to provide either \"exported_files\" or \"out\"")
 	} else if uc.Out != nil {
-		if ahoy_targets.IsTargetReference(*uc.Out) {
+		if zen_targets.IsTargetReference(*uc.Out) {
 			return nil, fmt.Errorf("out cannot be a reference")
 		}
 		extractTargetName = *uc.Out
@@ -37,13 +36,13 @@ func (uc UnarchiveConfig) GetTargets(tcc *ahoy_targets.TargetConfigContext) ([]*
 		outs = uc.ExportedFiles
 	}
 
-	opts := []ahoy_targets.TargetOption{
-		ahoy_targets.WithSrcs(map[string][]string{"src": {uc.Src}}),
-		ahoy_targets.WithOuts(outs),
-		ahoy_targets.WithLabels(uc.Labels),
-		ahoy_targets.WithTargetScript("build", &ahoy_targets.TargetScript{
+	opts := []zen_targets.TargetOption{
+		zen_targets.WithSrcs(map[string][]string{"src": {uc.Src}}),
+		zen_targets.WithOuts(outs),
+		zen_targets.WithLabels(uc.Labels),
+		zen_targets.WithTargetScript("build", &zen_targets.TargetScript{
 			Deps: uc.Deps,
-			Run: func(target *ahoy_targets.Target, runCtx *ahoy_targets.RuntimeContext) error {
+			Run: func(target *zen_targets.Target, runCtx *zen_targets.RuntimeContext) error {
 				interpolatedTarget, err := target.Interpolate(extractTargetName)
 				if err != nil {
 					return err
@@ -84,7 +83,7 @@ func (uc UnarchiveConfig) GetTargets(tcc *ahoy_targets.TargetConfigContext) ([]*
 
 					for _, from := range paths {
 						to := filepath.Join(target.Cwd, strings.TrimPrefix(from, extractTarget))
-						if err := cp.Copy(from, to); err != nil {
+						if err := utils.Copy(from, to); err != nil {
 							return err
 						}
 					}
@@ -96,11 +95,11 @@ func (uc UnarchiveConfig) GetTargets(tcc *ahoy_targets.TargetConfigContext) ([]*
 	}
 
 	if uc.Binary {
-		opts = append(opts, ahoy_targets.WithBinary())
+		opts = append(opts, zen_targets.WithBinary())
 	}
 
-	return []*ahoy_targets.Target{
-		ahoy_targets.NewTarget(
+	return []*zen_targets.Target{
+		zen_targets.NewTarget(
 			uc.Name,
 			opts...,
 		),
