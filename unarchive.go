@@ -2,63 +2,51 @@ package archiving
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	zen_targets "github.com/zen-io/zen-core/target"
-	"github.com/zen-io/zen-core/utils"
-
-	doublestar "github.com/bmatcuk/doublestar/v4"
 )
 
 type UnarchiveConfig struct {
-	zen_targets.BaseFields `mapstructure:",squash"`
-	Src                    string   `mapstructure:"src"`
-	Out                    *string  `mapstructure:"out"`
-	ExportedFiles          []string `mapstructure:"exported_files"`
-	Binary                 bool     `mapstructure:"binary"`
+	Name          string            `mapstructure:"name" desc:"Name for the target"`
+	Description   string            `mapstructure:"desc" desc:"Target description"`
+	Labels        []string          `mapstructure:"labels" desc:"Labels to apply to the targets"`
+	Deps          []string          `mapstructure:"deps" desc:"Build dependencies"`
+	PassEnv       []string          `mapstructure:"pass_env" desc:"List of environment variable names that will be passed from the OS environment, they are part of the target hash"`
+	SecretEnv     []string          `mapstructure:"secret_env" desc:"List of environment variable names that will be passed from the OS environment, they are not used to calculate the target hash"`
+	Env           map[string]string `mapstructure:"env" desc:"Key-Value map of static environment variables to be used"`
+	Visibility    []string          `mapstructure:"visibility" desc:"List of visibility for this target"`
+	Src           string            `mapstructure:"src"`
+	ExportedFiles []string          `mapstructure:"exported_files"`
+	Binary        bool              `mapstructure:"binary"`
 }
 
 func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*zen_targets.Target, error) {
 	var outs []string
-	var extractTargetName string
-	if len(uc.ExportedFiles) == 0 && uc.Out == nil {
-		return nil, fmt.Errorf("need to provide either \"exported_files\" or \"out\"")
-	} else if uc.Out != nil {
-		if zen_targets.IsTargetReference(*uc.Out) {
-			return nil, fmt.Errorf("out cannot be a reference")
-		}
-		extractTargetName = *uc.Out
-		outs = []string{fmt.Sprintf("%s/**/*", *uc.Out)}
-	} else {
-		extractTargetName = "extract"
+
+	if uc.ExportedFiles != nil {
 		outs = uc.ExportedFiles
+	} else {
+		outs = append(outs, "**/*")
 	}
 
 	opts := []zen_targets.TargetOption{
 		zen_targets.WithSrcs(map[string][]string{"src": {uc.Src}}),
 		zen_targets.WithOuts(outs),
 		zen_targets.WithLabels(uc.Labels),
+		zen_targets.WithVisibility(uc.Visibility),
+		zen_targets.WithPassEnv(uc.PassEnv),
+		zen_targets.WithSecretEnvVars(uc.SecretEnv),
+		zen_targets.WithDescription(uc.Description),
 		zen_targets.WithTargetScript("build", &zen_targets.TargetScript{
 			Deps: uc.Deps,
 			Run: func(target *zen_targets.Target, runCtx *zen_targets.RuntimeContext) error {
-				interpolatedTarget, err := target.Interpolate(extractTargetName)
-				if err != nil {
-					return err
-				}
-
-				extractTarget := filepath.Join(target.Cwd, interpolatedTarget)
-
 				if len(target.Srcs["src"]) == 0 {
 					return fmt.Errorf("no srcs provided")
 				}
 				filePath := target.Srcs["src"][0]
 
-				if err := os.MkdirAll(extractTarget, os.ModePerm); err != nil {
-					return err
-				}
-				var decompressFunc func(string, string) error
+				var decompressFunc func(string, string) ([]string, error)
 				switch {
 				case strings.HasSuffix(filePath, ".zip"):
 					decompressFunc = ExtractZip
@@ -69,25 +57,25 @@ func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*z
 				default:
 					return fmt.Errorf("unknown file type")
 				}
-
 				// Decompress the file
-				if err := decompressFunc(filePath, extractTarget); err != nil {
+				_, err := decompressFunc(filePath, target.Cwd)
+				if err != nil {
 					return fmt.Errorf("error decompressing file: %w", err)
 				}
 
-				for _, o := range target.Outs {
-					paths, err := doublestar.FilepathGlob(filepath.Join(extractTarget, o))
-					if err != nil {
-						return err
-					}
+				// for _, o := range target.Outs {
+				// 	paths, err := doublestar.FilepathGlob(filepath.Join(target.Cwd, o))
+				// 	if err != nil {
+				// 		return err
+				// 	}
 
-					for _, from := range paths {
-						to := filepath.Join(target.Cwd, strings.TrimPrefix(from, extractTarget))
-						if err := utils.Copy(from, to); err != nil {
-							return err
-						}
-					}
-				}
+				// 	for _, from := range paths {
+				// 		to := filepath.Join(target.Cwd, strings.TrimPrefix(from, target.Cwd))
+				// 		if err := utils.Copy(from, to); err != nil {
+				// 			return err
+				// 		}
+				// 	}
+				// }
 
 				return nil
 			},

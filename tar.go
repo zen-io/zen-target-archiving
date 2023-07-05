@@ -62,44 +62,46 @@ func (t *TarArchive) CompressFile(src, dest string, info fs.FileInfo) error {
 }
 
 // untar extracts a tar archive to the specified destination directory.
-func ExtractTar(src string, dst string) error {
+func ExtractTar(src string, dst string) ([]string, error) {
 	file, err := os.Open(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer file.Close()
 
 	tarReader := tar.NewReader(file)
 
+	outs := []string{}
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
+		outs = append(outs, header.Name)
 
 		target := filepath.Join(dst, header.Name)
 
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
-				return err
+				return nil, err
 			}
 		case tar.TypeReg:
 			outfile, err := os.Create(target)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer outfile.Close()
 			if _, err := io.Copy(outfile, tarReader); err != nil {
-				return err
+				return nil, err
 			}
 		default:
-			return fmt.Errorf("unknown type: %v in %s", header.Typeflag, header.Name)
+			return nil, fmt.Errorf("unknown type: %v in %s", header.Typeflag, header.Name)
 		}
 	}
 
-	return nil
+	return outs, nil
 }

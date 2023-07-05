@@ -58,45 +58,47 @@ func (z *ZipArchive) CompressFile(src, dest string, info fs.FileInfo) error {
 }
 
 // unzip extracts a zip archive to the specified destination directory.
-func ExtractZip(src string, dst string) error {
+func ExtractZip(src string, dst string) ([]string, error) {
 	file, err := os.Open(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer file.Close()
 
 	zipReader, err := zip.OpenReader(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer zipReader.Close()
 
+	outs := []string{}
 	for _, file := range zipReader.File {
+		outs = append(outs, file.Name)
 		target := filepath.Join(dst, file.Name)
 
 		if file.FileInfo().IsDir() {
 			if err := os.MkdirAll(target, file.Mode()); err != nil {
-				return err
+				return nil, err
 			}
 			continue
 		}
 
 		outfile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer outfile.Close()
 
 		rc, err := file.Open()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer rc.Close()
 
 		if _, err := io.Copy(outfile, rc); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return outs, nil
 }

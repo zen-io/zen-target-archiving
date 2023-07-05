@@ -35,7 +35,7 @@ type ArchiveConfig struct {
 	Tools         map[string]string `mapstructure:"tools" desc:"Key-Value map of tools to include when executing this target. Values can be references"`
 	Visibility    []string          `mapstructure:"visibility" desc:"List of visibility for this target"`
 	Srcs          []string          `mapstructure:"srcs"`
-	Type          ArchiveType       `mapstructure:"type"`
+	Type          *ArchiveType      `mapstructure:"type"`
 	Out           string            `mapstructure:"out"`
 	ExclusionFile *string           `mapstructure:"exclusion_file"`
 	Exclusions    []string          `mapstructure:"exclusions"`
@@ -59,9 +59,15 @@ func (ac ArchiveConfig) GetTargets(_ *zen_targets.TargetConfigContext) ([]*zen_t
 			Run: func(target *zen_targets.Target, runCtx *zen_targets.RuntimeContext) error {
 				var archiver Archiver
 				var err error
-				out := filepath.Join(target.Cwd, ac.Out)
 
-				switch ac.Type {
+				var outType ArchiveType
+				if ac.Type == nil {
+					outType = ArchiveType(utils.FileExtension(ac.Out)[1:])
+				} else {
+					outType = *ac.Type
+				}
+				out := filepath.Join(target.Cwd, target.Outs[0])
+				switch outType {
 				case Zip:
 					archiver, err = NewZipArchive(out)
 				case Tar:

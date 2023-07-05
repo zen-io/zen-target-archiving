@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.6.0
-	github.com/zen-io/zen-core v0.0.0-20230629185926-24b38b41eeb8
+	github.com/zen-io/zen-core v0.0.0-20230705085957-87141151122f
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 )
 
