@@ -32,7 +32,6 @@ type ArchiveConfig struct {
 	PassEnv       []string          `mapstructure:"pass_env" desc:"List of environment variable names that will be passed from the OS environment, they are part of the target hash"`
 	SecretEnv     []string          `mapstructure:"secret_env" desc:"List of environment variable names that will be passed from the OS environment, they are not used to calculate the target hash"`
 	Env           map[string]string `mapstructure:"env" desc:"Key-Value map of static environment variables to be used"`
-	Tools         map[string]string `mapstructure:"tools" desc:"Key-Value map of tools to include when executing this target. Values can be references"`
 	Visibility    []string          `mapstructure:"visibility" desc:"List of visibility for this target"`
 	Srcs          []string          `mapstructure:"srcs"`
 	Type          *ArchiveType      `mapstructure:"type"`
@@ -51,6 +50,9 @@ func (ac ArchiveConfig) GetTargets(_ *zen_targets.TargetConfigContext) ([]*zen_t
 		zen_targets.WithSrcs(srcs),
 		zen_targets.WithOuts([]string{ac.Out}),
 		zen_targets.WithLabels(ac.Labels),
+		zen_targets.WithVisibility(ac.Visibility),
+		zen_targets.WithEnvVars(ac.Env),
+		zen_targets.WithPassEnv(ac.PassEnv),
 	}
 
 	opts = append(opts,
@@ -73,7 +75,7 @@ func (ac ArchiveConfig) GetTargets(_ *zen_targets.TargetConfigContext) ([]*zen_t
 				case Tar:
 					archiver, err = NewTarArchive(out)
 				default:
-					return fmt.Errorf("archive type %s not accepted. Valid choices are 'zip' and 'tar'", ac.Type)
+					return fmt.Errorf("archive type %v not accepted. Valid choices are 'zip' and 'tar'", ac.Type)
 				}
 				if err != nil {
 					return err

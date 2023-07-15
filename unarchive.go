@@ -57,25 +57,11 @@ func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*z
 				default:
 					return fmt.Errorf("unknown file type")
 				}
-				// Decompress the file
+
 				_, err := decompressFunc(filePath, target.Cwd)
 				if err != nil {
 					return fmt.Errorf("error decompressing file: %w", err)
 				}
-
-				// for _, o := range target.Outs {
-				// 	paths, err := doublestar.FilepathGlob(filepath.Join(target.Cwd, o))
-				// 	if err != nil {
-				// 		return err
-				// 	}
-
-				// 	for _, from := range paths {
-				// 		to := filepath.Join(target.Cwd, strings.TrimPrefix(from, target.Cwd))
-				// 		if err := utils.Copy(from, to); err != nil {
-				// 			return err
-				// 		}
-				// 	}
-				// }
 
 				return nil
 			},

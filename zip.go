@@ -17,7 +17,7 @@ type ZipArchive struct {
 func NewZipArchive(dest string) (*ZipArchive, error) {
 	output, err := os.Create(dest)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create output file:", err)
+		return nil, fmt.Errorf("failed to create output file: %w", err)
 	}
 
 	return &ZipArchive{
