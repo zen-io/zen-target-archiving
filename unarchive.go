@@ -8,20 +8,20 @@ import (
 )
 
 type UnarchiveConfig struct {
-	Name          string            `mapstructure:"name" desc:"Name for the target"`
-	Description   string            `mapstructure:"desc" desc:"Target description"`
-	Labels        []string          `mapstructure:"labels" desc:"Labels to apply to the targets"`
-	Deps          []string          `mapstructure:"deps" desc:"Build dependencies"`
-	PassEnv       []string          `mapstructure:"pass_env" desc:"List of environment variable names that will be passed from the OS environment, they are part of the target hash"`
-	SecretEnv     []string          `mapstructure:"secret_env" desc:"List of environment variable names that will be passed from the OS environment, they are not used to calculate the target hash"`
-	Env           map[string]string `mapstructure:"env" desc:"Key-Value map of static environment variables to be used"`
-	Visibility    []string          `mapstructure:"visibility" desc:"List of visibility for this target"`
+	Name          string            `mapstructure:"name" zen:"yes" desc:"Name for the target"`
+	Description   string            `mapstructure:"desc" zen:"yes" desc:"Target description"`
+	Labels        []string          `mapstructure:"labels" zen:"yes" desc:"Labels to apply to the targets"`
+	Deps          []string          `mapstructure:"deps" zen:"yes" desc:"Build dependencies"`
+	PassEnv       []string          `mapstructure:"pass_env" zen:"yes" desc:"List of environment variable names that will be passed from the OS environment, they are part of the target hash"`
+	PassSecretEnv []string          `mapstructure:"pass_secret_env" zen:"yes" desc:"List of environment variable names that will be passed from the OS environment, they are not used to calculate the target hash"`
+	Env           map[string]string `mapstructure:"env" zen:"yes" desc:"Key-Value map of static environment variables to be used"`
+	Visibility    []string          `mapstructure:"visibility" zen:"yes" desc:"List of visibility for this target"`
 	Src           string            `mapstructure:"src"`
 	ExportedFiles []string          `mapstructure:"exported_files"`
 	Binary        bool              `mapstructure:"binary"`
 }
 
-func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*zen_targets.Target, error) {
+func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*zen_targets.TargetBuilder, error) {
 	var outs []string
 
 	if uc.ExportedFiles != nil {
@@ -30,52 +30,42 @@ func (uc UnarchiveConfig) GetTargets(tcc *zen_targets.TargetConfigContext) ([]*z
 		outs = append(outs, "**/*")
 	}
 
-	opts := []zen_targets.TargetOption{
-		zen_targets.WithSrcs(map[string][]string{"src": {uc.Src}}),
-		zen_targets.WithOuts(outs),
-		zen_targets.WithLabels(uc.Labels),
-		zen_targets.WithVisibility(uc.Visibility),
-		zen_targets.WithPassEnv(uc.PassEnv),
-		zen_targets.WithSecretEnvVars(uc.SecretEnv),
-		zen_targets.WithDescription(uc.Description),
-		zen_targets.WithTargetScript("build", &zen_targets.TargetScript{
-			Deps: uc.Deps,
-			Run: func(target *zen_targets.Target, runCtx *zen_targets.RuntimeContext) error {
-				if len(target.Srcs["src"]) == 0 {
-					return fmt.Errorf("no srcs provided")
-				}
-				filePath := target.Srcs["src"][0]
+	tb := zen_targets.ToTarget(uc)
+	tb.Srcs = map[string][]string{"src": {uc.Src}}
+	tb.Outs = outs
 
-				var decompressFunc func(string, string) ([]string, error)
-				switch {
-				case strings.HasSuffix(filePath, ".zip"):
-					decompressFunc = ExtractZip
-				case strings.HasSuffix(filePath, ".tar"):
-					decompressFunc = ExtractTar
-				case strings.HasSuffix(filePath, ".tar.gz") || strings.HasSuffix(filePath, ".tgz"):
-					decompressFunc = ExtractTarGz
-				default:
-					return fmt.Errorf("unknown file type")
-				}
+	tb.Scripts["build"] = &zen_targets.TargetBuilderScript{
+		Deps: uc.Deps,
+		Run: func(target *zen_targets.Target, runCtx *zen_targets.RuntimeContext) error {
+			if len(target.Srcs["src"]) == 0 {
+				return fmt.Errorf("no srcs provided")
+			}
+			filePath := target.Srcs["src"][0]
 
-				_, err := decompressFunc(filePath, target.Cwd)
-				if err != nil {
-					return fmt.Errorf("error decompressing file: %w", err)
-				}
+			var decompressFunc func(string, string) ([]string, error)
+			switch {
+			case strings.HasSuffix(filePath, ".zip"):
+				decompressFunc = ExtractZip
+			case strings.HasSuffix(filePath, ".tar"):
+				decompressFunc = ExtractTar
+			case strings.HasSuffix(filePath, ".tar.gz") || strings.HasSuffix(filePath, ".tgz"):
+				decompressFunc = ExtractTarGz
+			default:
+				return fmt.Errorf("unknown file type")
+			}
 
-				return nil
-			},
-		}),
+			_, err := decompressFunc(filePath, target.Cwd)
+			if err != nil {
+				return fmt.Errorf("error decompressing file: %w", err)
+			}
+
+			return nil
+		},
 	}
 
 	if uc.Binary {
-		opts = append(opts, zen_targets.WithBinary())
+		tb.Binary = true
 	}
 
-	return []*zen_targets.Target{
-		zen_targets.NewTarget(
-			uc.Name,
-			opts...,
-		),
-	}, nil
+	return []*zen_targets.TargetBuilder{tb}, nil
 }

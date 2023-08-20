@@ -1,0 +1,6 @@
+# CHANGELOG
+
+## 0.0.3
+
+- [chore] Bump zen-core to 0.0.3
+- [feat] Allow passing env vars
